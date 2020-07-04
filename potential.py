@@ -20,10 +20,10 @@ original mass distribution. The effective density is given by 'rho_effective'
 below, and the spherical harmonic solver is in 'potential_sh'.
 """
 import numpy as np
-from constants import pc, kpc, pi, M_sun, G, Myr
+from .constants import pc, kpc, pi, M_sun, G
 from scipy.special import sph_harm
 from scipy.interpolate import RectBivariateSpline as RBS
-import matplotlib.pyplot as plt
+import sys
 
 
 def sech(x):
@@ -249,7 +249,8 @@ def potential_sh(l_max, N_q, N_theta, N_phi, r_min, r_max, verbose=False):
     for l in range(l_max + 1):
         for m in range(-l, l + 1, 1):
             if verbose:
-                print(l, m)
+                sys.stdout.write(str(l)+', '+str(m)+'\n')
+                sys.stdout.flush()
 
             # get Ylm* at these coords
             Ystar_grid = sph_harm(m, l, phi_grid, theta_grid).conjugate()
@@ -340,8 +341,8 @@ def rho_effective(pos):
     return rho
 
 
-def potential(l_max=16, N_q=2001, N_theta=750, N_phi=20,
-              r_min=1e-4 * kpc, r_max=1e+4 * kpc, verbose=False):
+def potential_solve(l_max=16, N_q=2001, N_theta=750, N_phi=20,
+                    r_min=1e-4 * kpc, r_max=1e+4 * kpc, verbose=False):
 
     # get spherical coords and potential from multipole expansion
     r, theta, phi, pot_ME = potential_sh(l_max, N_q, N_theta, N_phi,
@@ -406,14 +407,3 @@ def create_accel_fn(r, theta, phi, pot):
         return a
 
     return accel
-
-
-if __name__ == '__main__':
-    
-    l_max = 20
-    r, theta, phi, pot_verbose = potential_sh(l_max=l_max, N_q=501, N_theta=250, N_phi=20,
-                                              r_min=1e-4 * kpc, r_max=1e+4 * kpc, verbose=True)
-
-    for i in range(l_max+1):
-        print(i, np.max(np.abs(pot_verbose[i]/pot_verbose[-1] - 1)))
-
