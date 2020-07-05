@@ -231,16 +231,18 @@ def potential_sh(l_max, N_q, N_theta, N_phi, r_min, r_max, verbose=False):
     theta = np.linspace(0.5 * h_theta, pi - 0.5 * h_theta, N_theta)
     phi = np.linspace(0.5 * h_phi, 2 * pi - 0.5 * h_phi, N_phi)
     r_grid, theta_grid, phi_grid = np.meshgrid(r, theta, phi, indexing='ij')
+    sth = np.sin(theta_grid)
 
     # convert to Cartesian coords
-    x_grid = r_grid * np.sin(theta_grid) * np.cos(phi_grid)
-    y_grid = r_grid * np.sin(theta_grid) * np.sin(phi_grid)
+    x_grid = r_grid * sth * np.cos(phi_grid)
+    y_grid = r_grid * sth * np.sin(phi_grid)
     z_grid = r_grid * np.cos(theta_grid)
     pos_grid = np.stack((x_grid, y_grid, z_grid), axis=-1)
 
     # sample rho at these coords, and convert to Msun / kpc**3
     rho_grid = rho_effective(pos_grid * kpc)
     rho_grid *= (kpc**3 / M_sun)
+    rhosth = rho_grid * sth
 
     # loop over spherical harmonics
     if verbose:
@@ -249,15 +251,15 @@ def potential_sh(l_max, N_q, N_theta, N_phi, r_min, r_max, verbose=False):
     for l in range(l_max + 1):
         for m in range(-l, l + 1, 1):
             if verbose:
-                sys.stdout.write(str(l)+', '+str(m)+'\n')
+                sys.stdout.write(str(l) + ', ' + str(m) + '\n')
                 sys.stdout.flush()
 
             # get Ylm* at these coords
-            Ystar_grid = sph_harm(m, l, phi_grid, theta_grid).conjugate()
-            Y_grid = sph_harm(m, l, phi_grid, theta_grid)
+            Y_grid = sph_harm(m, l, phi_grid[0], theta_grid[0])[None, ...]
+            Ystar_grid = Y_grid.conjugate()
 
             # perform theta/phi summation
-            integrand = rho_grid * Ystar_grid * np.sin(theta_grid)
+            integrand = rhosth * Ystar_grid
             S = np.sum(integrand, axis=(1, 2))
 
             # radial summation
