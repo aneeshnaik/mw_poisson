@@ -263,11 +263,13 @@ def potential_sh(l_max, N_q, N_theta, N_phi, r_min, r_max, verbose=False):
             S = np.sum(integrand, axis=(1, 2))
 
             # radial summation
-            summand_int = np.exp((l + 3) * q) * S
-            summand_ext = np.append((np.exp((-l + 2) * q) * S)[1:], 0)
+            rl = np.exp(l * q, dtype=np.float128)
+            rlp1 = np.exp((l + 1) * q, dtype=np.float128)
+            summand_int = np.exp((l + 3) * q, dtype=np.float128) * S
+            summand_ext = np.append((np.exp((-l + 2) * q, dtype=np.float128) * S)[1:], 0)
             C_int = np.cumsum(summand_int)
             C_ext = np.flipud(np.cumsum(np.flipud(summand_ext)))
-            C = h_theta * h_phi * h_q * (C_int / r**(l + 1) + r**l * C_ext)
+            C = h_theta * h_phi * h_q * (C_int / rlp1 + rl * C_ext)
             C = C.astype(complex)
             potlm = -4 * pi * G * C[:, None, None] * Y_grid / (2 * l + 1)
             pot += potlm
