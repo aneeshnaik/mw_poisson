@@ -54,7 +54,7 @@ def rho_bulge(pos):
     alpha = 1.8
     r_0 = 0.075 * kpc
     r_cut = 2.1 * kpc
-    rho_0 = 98.4 * (M_sun / pc**3)
+    rho_0 = 98.351 * (M_sun / pc**3)
 
     # calculate density
     rp = np.sqrt(R**2 + (z / q)**2)
@@ -78,8 +78,8 @@ def rho_halo(pos):
     r = np.linalg.norm(pos, axis=-1)
 
     # parameters from McMillan (2017)
-    r_h = 19.6 * kpc
-    rho_0 = 0.00854 * (M_sun / pc**3)
+    r_h = 19.5725 * kpc
+    rho_0 = 0.00853702 * (M_sun / pc**3)
 
     # calculate density
     x = r / r_h
@@ -192,92 +192,92 @@ def potential_disc(pos):
             bigH = bigH_expdisc
             if disc == 'st_thin':
                 z0 = 300 * pc
-                dpars = {'sigma_0': 896 * (M_sun / pc**2),
-                         'R_0': 2.5 * kpc}
+                dpars = {'sigma_0': 895.679 * (M_sun / pc**2),
+                         'R_0': 2.49955 * kpc}
             else:
                 z0 = 900 * pc
-                dpars = {'sigma_0': 183 * (M_sun / pc**2),
-                         'R_0': 3.02 * kpc}
+                dpars = {'sigma_0': 183.444 * (M_sun / pc**2),
+                         'R_0': 3.02134 * kpc}
         else:
             sigma = sigma_holedisc
             bigH = bigH_sechdisc
             if disc == 'HI':
                 z0 = 85 * pc
-                dpars = {'sigma_0': 53.1 * (M_sun / pc**2),
+                dpars = {'sigma_0': 53.1319 * (M_sun / pc**2),
                          'R_0': 7 * kpc, 'R_h': 4 * kpc}
             else:
                 z0 = 45 * pc
-                dpars = {'sigma_0': 2180 * (M_sun / pc**2),
+                dpars = {'sigma_0': 2179.95 * (M_sun / pc**2),
                          'R_0': 1.5 * kpc, 'R_h': 12 * kpc}
 
         phi_d += 4 * pi * G * sigma(r, **dpars) * bigH(z, z0)
     return phi_d
 
 
-def potential_sh(l_max, N_q, N_theta, N_phi, r_min, r_max, verbose=False):
+def potential_sh(l_max, N_q, N_theta, r_min, r_max, verbose=False):
     """Calculate potential using spherical harmonic expansion."""
     # convert distances to kpc to give more tractable numbers
     r_min /= kpc
     r_max /= kpc
-
+    
     # create grids of q=ln r, theta, phi
     q_min = np.log(r_min)
     q_max = np.log(r_max)
     h_q = (q_max - q_min) / N_q
     h_theta = pi / N_theta
-    h_phi = 2 * pi / N_phi
     q = np.linspace(q_min + 0.5 * h_q, q_max - 0.5 * h_q, N_q)
     r = np.exp(q)
     theta = np.linspace(0.5 * h_theta, pi - 0.5 * h_theta, N_theta)
-    phi = np.linspace(0.5 * h_phi, 2 * pi - 0.5 * h_phi, N_phi)
-    r_grid, theta_grid, phi_grid = np.meshgrid(r, theta, phi, indexing='ij')
+    r_grid, theta_grid = np.meshgrid(r, theta, indexing='ij')
     sth = np.sin(theta_grid)
-
+    cth = np.cos(theta_grid)
+    
     # convert to Cartesian coords
-    x_grid = r_grid * sth * np.cos(phi_grid)
-    y_grid = r_grid * sth * np.sin(phi_grid)
-    z_grid = r_grid * np.cos(theta_grid)
+    x_grid = r_grid * sth
+    y_grid = np.zeros_like(x_grid)
+    z_grid = r_grid * cth
     pos_grid = np.stack((x_grid, y_grid, z_grid), axis=-1)
-
+    
     # sample rho at these coords, and convert to Msun / kpc**3
     rho_grid = rho_effective(pos_grid * kpc)
     rho_grid *= (kpc**3 / M_sun)
     rhosth = rho_grid * sth
-
+    
     # loop over spherical harmonics
     if verbose:
         print("Performing harmonic expansion...")
-    pot = np.zeros_like(rho_grid, dtype=np.complex128)
+    pot = np.zeros_like(rho_grid)
     for l in range(l_max + 1):
-        for m in range(-l, l + 1, 1):
-            if verbose:
-                sys.stdout.write(str(l) + ', ' + str(m) + '\n')
-                sys.stdout.flush()
+        m = 0
+        if verbose:
+            sys.stdout.write(str(l) + '\n')
+            sys.stdout.flush()
+    
+        # get Ylm* at these coords
+        Y_grid = sph_harm(m, l, 0, theta_grid[0])[None, ...]
+        Ystar_grid = Y_grid.conjugate()
+    
+        # perform theta summation
+        integrand = 2 * pi * rhosth * Ystar_grid
+        S = np.sum(integrand, axis=1)
+    
+        # radial summation
+        rl = np.exp(l * q, dtype=np.float128)
+        rlp1 = np.exp((l + 1) * q, dtype=np.float128)
+        summand_int = np.exp((l + 3) * q, dtype=np.float128) * S
+        summand_ext = np.append((np.exp((-l + 2) * q, dtype=np.float128) * S)[1:], 0)
+        C_int = np.cumsum(summand_int)
+        C_ext = np.flipud(np.cumsum(np.flipud(summand_ext)))
+        C = h_theta * h_q * (C_int / rlp1 + rl * C_ext)
+        C = C.astype(complex)
+        potlm = -4 * pi * G * C[:, None] * Y_grid / (2 * l + 1)
+        pot += potlm.real
 
-            # get Ylm* at these coords
-            Y_grid = sph_harm(m, l, phi_grid[0], theta_grid[0])[None, ...]
-            Ystar_grid = Y_grid.conjugate()
-
-            # perform theta/phi summation
-            integrand = rhosth * Ystar_grid
-            S = np.sum(integrand, axis=(1, 2))
-
-            # radial summation
-            rl = np.exp(l * q, dtype=np.float128)
-            rlp1 = np.exp((l + 1) * q, dtype=np.float128)
-            summand_int = np.exp((l + 3) * q, dtype=np.float128) * S
-            summand_ext = np.append((np.exp((-l + 2) * q, dtype=np.float128) * S)[1:], 0)
-            C_int = np.cumsum(summand_int)
-            C_ext = np.flipud(np.cumsum(np.flipud(summand_ext)))
-            C = h_theta * h_phi * h_q * (C_int / rlp1 + rl * C_ext)
-            C = C.astype(complex)
-            potlm = -4 * pi * G * C[:, None, None] * Y_grid / (2 * l + 1)
-            pot += potlm
-
-    # convert potential back to SI
+    # convert potential and radii back to SI
     pot *= (M_sun / kpc)
+    r *= kpc
 
-    return r * kpc, theta, phi, pot.real
+    return r, theta, pot
 
 
 def rho_effective(pos):
@@ -305,12 +305,12 @@ def rho_effective(pos):
             bigH_p = bigH_p_expdisc
             if disc == 'st_thin':
                 z0 = 300 * pc
-                dpars = {'sigma_0': 896 * (M_sun / pc**2),
-                         'R_0': 2.5 * kpc}
+                dpars = {'sigma_0': 895.679 * (M_sun / pc**2),
+                         'R_0': 2.49955 * kpc}
             else:
                 z0 = 900 * pc
-                dpars = {'sigma_0': 183 * (M_sun / pc**2),
-                         'R_0': 3.02 * kpc}
+                dpars = {'sigma_0': 183.444 * (M_sun / pc**2),
+                         'R_0': 3.02134 * kpc}
         else:
             sigma = sigma_holedisc
             sigma_p = sigma_p_holedisc
@@ -320,11 +320,11 @@ def rho_effective(pos):
             bigH_p = bigH_p_sechdisc
             if disc == 'HI':
                 z0 = 85 * pc
-                dpars = {'sigma_0': 53.1 * (M_sun / pc**2),
+                dpars = {'sigma_0': 53.1319 * (M_sun / pc**2),
                          'R_0': 7 * kpc, 'R_h': 4 * kpc}
             else:
                 z0 = 45 * pc
-                dpars = {'sigma_0': 2180 * (M_sun / pc**2),
+                dpars = {'sigma_0': 2179.95 * (M_sun / pc**2),
                          'R_0': 1.5 * kpc, 'R_h': 12 * kpc}
 
         # evaluate functions
@@ -345,30 +345,27 @@ def rho_effective(pos):
     return rho
 
 
-def potential_solve(l_max=16, N_q=2001, N_theta=750, N_phi=20,
+def potential_solve(l_max=16, N_q=2001, N_theta=750,
                     r_min=1e-4 * kpc, r_max=1e+4 * kpc, verbose=False):
 
     # get spherical coords and potential from multipole expansion
-    r, theta, phi, pot_ME = potential_sh(l_max, N_q, N_theta, N_phi,
+    r, theta, pot_ME = potential_sh(l_max, N_q, N_theta,
                                          r_min, r_max, verbose=verbose)
 
     # convert to Cartesians and add disc component
-    r_grid, theta_grid, phi_grid = np.meshgrid(r, theta, phi, indexing='ij')
-    x_grid = r_grid * np.sin(theta_grid) * np.cos(phi_grid)
-    y_grid = r_grid * np.sin(theta_grid) * np.sin(phi_grid)
+    r_grid, theta_grid = np.meshgrid(r, theta, indexing='ij')
+    x_grid = r_grid * np.sin(theta_grid)
+    y_grid = np.zeros_like(x_grid)
     z_grid = r_grid * np.cos(theta_grid)
     pos_edge = np.stack((x_grid, y_grid, z_grid), axis=-1)
     pot = potential_disc(pos_edge) + pot_ME
 
-    return r, theta, phi, pot
+    return r, theta, pot
 
 
-def create_accel_fn(r, theta, phi, pot):
+def create_accel_fn(r, theta, pot):
 
     q = np.log(r)
-
-    # azimuthally average the potential
-    pot = np.average(pot, axis=2)
 
     # first derivs via finite differencing
     dpdq = np.diff(pot, axis=0) / np.diff(q)[:, None]
