@@ -20,163 +20,15 @@ original mass distribution. The effective density is given by 'rho_effective'
 below, and the spherical harmonic solver is in 'potential_sh'.
 """
 import numpy as np
-from .constants import pc, kpc, pi, M_sun, G
+from .constants import kpc, pi, M_sun, G
+from .util import print_progress
+from .profiles import sigma, sigma_p, sigma_pp, zeta, bigH, bigH_p, rho_sph
 from scipy.special import sph_harm
 from scipy.interpolate import RectBivariateSpline as RBS
 import sys
 
 
-def sech(x):
-    """Hyperbolic sech function."""
-    return 1 / np.cosh(x)
-
-
-def rho_bulge(pos):
-    """
-    Galactic bulge density.
-
-    Calculate density of axisymmetric Bissantz-Gerhard bulge, using parameters
-    from McMillan (2017). The functional form is Eq. (1) in McMillan (2017).
-
-    Parameters
-    ----------
-    pos : array-like, shape (..., 3)
-        Positions at which to evaluate density. UNITS: metres.
-    """
-    # get z and cylindrical radius from pos
-    x = pos[..., 0]
-    y = pos[..., 1]
-    z = pos[..., 2]
-    R = np.sqrt(x**2 + y**2)
-
-    # parameter values from McMillan (2017)
-    q = 0.5
-    alpha = 1.8
-    r_0 = 0.075 * kpc
-    r_cut = 2.1 * kpc
-    rho_0 = 98.351 * (M_sun / pc**3)
-
-    # calculate density
-    rp = np.sqrt(R**2 + (z / q)**2)
-    rho = (rho_0 / (1 + rp / r_0)**alpha) * np.exp(-(rp / r_cut)**2)
-    return rho
-
-
-def rho_halo(pos):
-    """
-    Galactic bulge density.
-
-    Calculate density of NFW halo, using parameters from McMillan (2017). The
-    functional form is Eq. (5) in McMillan (2017).
-
-    Parameters
-    ----------
-    pos : array-like, shape (..., 3)
-        Positions at which to evaluate density. UNITS: metres.
-    """
-    # get spherical radius from pos
-    r = np.linalg.norm(pos, axis=-1)
-
-    # parameters from McMillan (2017)
-    r_h = 19.5725 * kpc
-    rho_0 = 0.00853702 * (M_sun / pc**3)
-
-    # calculate density
-    x = r / r_h
-    rho = rho_0 / (x * (1 + x)**2)
-    return rho
-
-
-def sigma_expdisc(R, sigma_0, R_0):
-    """Surface density of exponential disc."""
-    sig = sigma_0 * np.exp(-R / R_0)
-    return sig
-
-
-def sigma_p_expdisc(R, sigma_0, R_0):
-    """First derivative of exponential disc surface density."""
-    const = -sigma_0 / R_0
-    sig_p = const * np.exp(-R / R_0)
-    return sig_p
-
-
-def sigma_pp_expdisc(R, sigma_0, R_0):
-    """Second derivative of exponential disc surface density."""
-    const = sigma_0 / R_0**2
-    sig_pp = const * np.exp(-R / R_0)
-    return sig_pp
-
-
-def zeta_expdisc(z, z_0):
-    """Vertical density profile of exponential disc."""
-    const = (1 / (2 * z_0))
-    h = const * np.exp(-np.abs(z) / z_0)
-    return h
-
-
-def bigH_expdisc(z, z_0):
-    """Equivalent to second integral of zeta_expdisc; 0 in disc-plane."""
-    const = z_0 / 2
-    x = np.abs(z) / z_0
-    H = const * (np.exp(-x) - 1 + x)
-    return H
-
-
-def bigH_p_expdisc(z, z_0):
-    """First derivative of bigH function above."""
-    H_p = np.zeros_like(z)
-    mask = z != 0
-    zi = z[mask]
-    H_p[mask] = 0.5 * (zi / np.abs(zi)) * (1 - np.exp(-np.abs(zi) / z_0))
-    return H_p
-
-
-def sigma_holedisc(R, sigma_0, R_0, R_h):
-    """Surface density of exponential disc with central hole."""
-    x = (R_h / R) + (R / R_0)
-    sig = sigma_0 * np.exp(-x)
-    return sig
-
-
-def sigma_p_holedisc(R, sigma_0, R_0, R_h):
-    """1st deriv. of surface density of exponential disc with central hole."""
-    x = (R_h / R) + (R / R_0)
-    sig = (sigma_0 / R) * np.exp(-x) * ((R_h / R) - (R / R_0))
-    return sig
-
-
-def sigma_pp_holedisc(R, sigma_0, R_0, R_h):
-    """2nd deriv. of surface density of exponential disc with central hole."""
-    x = (R_h / R) + (R / R_0)
-    fac = (R_h / R)**2 - 2 * (R_h / R_0) + (R / R_0)**2 - 2 * (R_h / R)
-    sig = (sigma_0 / R**2) * np.exp(-x) * fac
-    return sig
-
-
-def zeta_sechdisc(z, z_0):
-    """Vertical density profile of sech^2 disc."""
-    const = (1 / (4 * z_0))
-    mask = np.abs(z) < (25 * z_0)
-    h = np.zeros_like(z)
-    h[mask] = const * sech(z[mask] / (2 * z_0))**2
-    return h
-
-
-def bigH_sechdisc(z, z_0):
-    """Equivalent to second integral of zeta_sechdisc; 0 in disc-plane."""
-    mask = np.abs(z) < (25 * z_0)
-    H = z_0 * (np.abs(z) / (2 * z_0) - np.log(2))
-    H[mask] = z_0 * np.log(np.cosh(z[mask] / (2 * z_0)))
-    return H
-
-
-def bigH_p_sechdisc(z, z_0):
-    """First derivative of bigH function above."""
-    H_p = 0.5 * np.tanh(z / (2 * z_0))
-    return H_p
-
-
-def potential_disc(pos):
+def potential_disc(pos, ndiscs, dpars):
     """Calculate analytic disc-plane component of the potential."""
     # get z and spherical radius r from pos
     z = pos[..., 2]
@@ -184,43 +36,19 @@ def potential_disc(pos):
 
     # loop over stellar and gas discs
     phi_d = np.zeros_like(z)
-    for disc in ['st_thin', 'st_thick', 'HI', 'H2']:
-
-        # for each component, choose appropriate functions and parameters
-        if disc in ['st_thin', 'st_thick']:
-            sigma = sigma_expdisc
-            bigH = bigH_expdisc
-            if disc == 'st_thin':
-                z0 = 300 * pc
-                dpars = {'sigma_0': 895.679 * (M_sun / pc**2),
-                         'R_0': 2.49955 * kpc}
-            else:
-                z0 = 900 * pc
-                dpars = {'sigma_0': 183.444 * (M_sun / pc**2),
-                         'R_0': 3.02134 * kpc}
-        else:
-            sigma = sigma_holedisc
-            bigH = bigH_sechdisc
-            if disc == 'HI':
-                z0 = 85 * pc
-                dpars = {'sigma_0': 53.1319 * (M_sun / pc**2),
-                         'R_0': 7 * kpc, 'R_h': 4 * kpc}
-            else:
-                z0 = 45 * pc
-                dpars = {'sigma_0': 2179.95 * (M_sun / pc**2),
-                         'R_0': 1.5 * kpc, 'R_h': 12 * kpc}
-
-        phi_d += 4 * pi * G * sigma(r, **dpars) * bigH(z, z0)
+    for i in range(ndiscs):
+        phi_d += 4 * pi * G * sigma(r, **dpars[i]) * bigH(z, **dpars[i])
     return phi_d
 
 
-def potential_sh(l_max, N_q, N_theta, r_min, r_max, verbose=False):
+def potential_sh(ndiscs, dpars, nspheroids, spars, l_max, N_q, N_theta,
+                 r_min, r_max, verbose=False):
     """Calculate potential using spherical harmonic expansion."""
     # convert distances to kpc to give more tractable numbers
     r_min /= kpc
     r_max /= kpc
-    
-    # create grids of q=ln r, theta, phi
+
+    # create grids of q=ln r, theta
     q_min = np.log(r_min)
     q_max = np.log(r_max)
     h_q = (q_max - q_min) / N_q
@@ -231,43 +59,41 @@ def potential_sh(l_max, N_q, N_theta, r_min, r_max, verbose=False):
     r_grid, theta_grid = np.meshgrid(r, theta, indexing='ij')
     sth = np.sin(theta_grid)
     cth = np.cos(theta_grid)
-    
+
     # convert to Cartesian coords
     x_grid = r_grid * sth
     y_grid = np.zeros_like(x_grid)
     z_grid = r_grid * cth
     pos_grid = np.stack((x_grid, y_grid, z_grid), axis=-1)
-    
+
     # sample rho at these coords, and convert to Msun / kpc**3
-    rho_grid = rho_effective(pos_grid * kpc)
+    rho_grid = rho_effective(pos_grid * kpc, ndiscs, dpars, nspheroids, spars)
     rho_grid *= (kpc**3 / M_sun)
     rhosth = rho_grid * sth
-    
+
     # loop over spherical harmonics
     if verbose:
         print("Performing harmonic expansion...")
     pot = np.zeros_like(rho_grid)
     for l in range(l_max + 1):
-        m = 0
         if verbose:
-            sys.stdout.write(str(l) + '\n')
-            sys.stdout.flush()
-    
+            print_progress(l, l_max + 1, interval=1)
+
         # get Ylm* at these coords
-        Y_grid = sph_harm(m, l, 0, theta_grid[0])[None, ...]
+        Y_grid = sph_harm(0, l, 0, theta_grid[0])[None, ...]
         Ystar_grid = Y_grid.conjugate()
-    
+
         # perform theta summation
         integrand = 2 * pi * rhosth * Ystar_grid
         S = np.sum(integrand, axis=1)
-    
+
         # radial summation
         rl = np.exp(l * q, dtype=np.float128)
         rlp1 = np.exp((l + 1) * q, dtype=np.float128)
-        summand_int = np.exp((l + 3) * q, dtype=np.float128) * S
-        summand_ext = np.append((np.exp((-l + 2) * q, dtype=np.float128) * S)[1:], 0)
-        C_int = np.cumsum(summand_int)
-        C_ext = np.flipud(np.cumsum(np.flipud(summand_ext)))
+        s_int = np.exp((l + 3) * q, dtype=np.float128) * S
+        s_ext = np.append((np.exp((-l + 2) * q, dtype=np.float128) * S)[1:], 0)
+        C_int = np.cumsum(s_int)
+        C_ext = np.flipud(np.cumsum(np.flipud(s_ext)))
         C = h_theta * h_q * (C_int / rlp1 + rl * C_ext)
         C = C.astype(complex)
         potlm = -4 * pi * G * C[:, None] * Y_grid / (2 * l + 1)
@@ -280,7 +106,7 @@ def potential_sh(l_max, N_q, N_theta, r_min, r_max, verbose=False):
     return r, theta, pot
 
 
-def rho_effective(pos):
+def rho_effective(pos, ndiscs, dpars, nspheroids, spars):
     """Effective density to feed to spherical harmonic solver."""
     # get cylindrical and spherical radii from pos
     x = pos[..., 0]
@@ -289,52 +115,22 @@ def rho_effective(pos):
     R = np.sqrt(x**2 + y**2)
     r = np.sqrt(R**2 + z**2)
 
-    # spheroidal densities
-    rho = rho_bulge(pos) + rho_halo(pos)
+    # loop over spheroids and add actual densities
+    rho = np.zeros_like(r)
+    for i in range(nspheroids):
+        rho += rho_sph(pos, **spars[i])
 
-    # add disc effective densities one by one: stellar and gas discs
-    for disc in ['st_thin', 'st_thick', 'HI', 'H2']:
-
-        # for each component, choose appropriate functions and parameters
-        if disc in ['st_thin', 'st_thick']:
-            sigma = sigma_expdisc
-            sigma_p = sigma_p_expdisc
-            sigma_pp = sigma_pp_expdisc
-            zeta = zeta_expdisc
-            bigH = bigH_expdisc
-            bigH_p = bigH_p_expdisc
-            if disc == 'st_thin':
-                z0 = 300 * pc
-                dpars = {'sigma_0': 895.679 * (M_sun / pc**2),
-                         'R_0': 2.49955 * kpc}
-            else:
-                z0 = 900 * pc
-                dpars = {'sigma_0': 183.444 * (M_sun / pc**2),
-                         'R_0': 3.02134 * kpc}
-        else:
-            sigma = sigma_holedisc
-            sigma_p = sigma_p_holedisc
-            sigma_pp = sigma_pp_holedisc
-            zeta = zeta_sechdisc
-            bigH = bigH_sechdisc
-            bigH_p = bigH_p_sechdisc
-            if disc == 'HI':
-                z0 = 85 * pc
-                dpars = {'sigma_0': 53.1319 * (M_sun / pc**2),
-                         'R_0': 7 * kpc, 'R_h': 4 * kpc}
-            else:
-                z0 = 45 * pc
-                dpars = {'sigma_0': 2179.95 * (M_sun / pc**2),
-                         'R_0': 1.5 * kpc, 'R_h': 12 * kpc}
+    # loop over discs and add effective densities
+    for i in range(ndiscs):
 
         # evaluate functions
-        sigR = sigma(R, **dpars)
-        sigr = sigma(r, **dpars)
-        sig_pr = sigma_p(r, **dpars)
-        sig_ppr = sigma_pp(r, **dpars)
-        h = zeta(z, z0)
-        H = bigH(z, z0)
-        H_p = bigH_p(z, z0)
+        sigR = sigma(R, **dpars[i])
+        sigr = sigma(r, **dpars[i])
+        sig_pr = sigma_p(r, **dpars[i])
+        sig_ppr = sigma_pp(r, **dpars[i])
+        h = zeta(z, **dpars[i])
+        H = bigH(z, **dpars[i])
+        H_p = bigH_p(z, **dpars[i])
 
         # calculate effective density
         t1 = (sigR - sigr) * h
@@ -345,12 +141,14 @@ def rho_effective(pos):
     return rho
 
 
-def potential_solve(l_max=16, N_q=2001, N_theta=750,
+def potential_solve(ndiscs, dpars, nspheroids, spars,
+                    l_max=16, N_q=2001, N_theta=750,
                     r_min=1e-4 * kpc, r_max=1e+4 * kpc, verbose=False):
 
     # get spherical coords and potential from multipole expansion
-    r, theta, pot_ME = potential_sh(l_max, N_q, N_theta,
-                                         r_min, r_max, verbose=verbose)
+    r, theta, pot_ME = potential_sh(ndiscs, dpars, nspheroids, spars,
+                                    l_max, N_q, N_theta,
+                                    r_min, r_max, verbose=verbose)
 
     # convert to Cartesians and add disc component
     r_grid, theta_grid = np.meshgrid(r, theta, indexing='ij')
@@ -358,7 +156,7 @@ def potential_solve(l_max=16, N_q=2001, N_theta=750,
     y_grid = np.zeros_like(x_grid)
     z_grid = r_grid * np.cos(theta_grid)
     pos_edge = np.stack((x_grid, y_grid, z_grid), axis=-1)
-    pot = potential_disc(pos_edge) + pot_ME
+    pot = potential_disc(pos_edge, ndiscs, dpars) + pot_ME
 
     return r, theta, pot
 
