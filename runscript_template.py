@@ -7,8 +7,8 @@ Created: Sat Jul  4 17:51:57 2020
 Author: A. P. Naik
 """
 import numpy as np
-from mw_poisson import potential_solve
-from mw_poisson.constants import kpc
+from mw_poisson import solve_potential
+from mw_poisson.constants import kpc, M_sun, pc
 
 
 # parameters for spherical harmonic expansion
@@ -36,8 +36,8 @@ s2 = {'alpha': 2, 'beta': 1, 'q': 1, 'r_cut': np.inf,
 filename = 'EXAMPLE'
 
 # solve for potential
-r, theta, pot = potential_solve(ndiscs=4, dpars=[d1, d2, d3, d4],
-                                nspheroids=2, spars=[s1,s2],
+r, theta, pot = solve_potential(ndiscs=4, dpars=[d1, d2, d3, d4],
+                                nspheroids=2, spars=[s1, s2],
                                 l_max=l_max, N_q=N_q, N_theta=N_theta,
                                 r_min=r_min, r_max=r_max, verbose=True)
 
