@@ -3,7 +3,7 @@
 """
 Various useful functions for mw_poisson package.
 
-Created: Wed Jul  8 11:07:57 2020
+Created: July 2020
 Author: A. P. Naik
 """
 import numpy as np
@@ -17,8 +17,12 @@ def sech(x):
 
 def print_progress(i, n, interval=1):
     """
-    Display a precentage progress bar within a for loop. Should be called at
-    each iteration of loop (see example below).
+    Display a percentage progress bar within a for loop.
+
+    This function prints (to standard output) a self-updating progress bar,
+    showing percentage completion of a for loop. Should be called at each
+    iteration of the loop (see example below). The 'interval' parameter can
+    optionally be used to adjust the update rate.
 
     Parameters
     ----------
@@ -39,14 +43,18 @@ def print_progress(i, n, interval=1):
     ...     do_something()
 
     """
-
-    if (i+1) % interval == 0:
+    # write 100% for final iteration regardless of whether interval is correct
+    if i + 1 == n:
+        sys.stdout.write('\r')
+        sys.stdout.write("[%-20s] 100%%" % ('=' * 20))
+        sys.stdout.flush()
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+    # if 'interval' number of iters, then print progress bar
+    elif (i + 1) % interval == 0:
         sys.stdout.write('\r')
         j = (i + 1) / n
-        sys.stdout.write("[%-20s] %d%%" % ('='*int(20*j), 100*j))
+        sys.stdout.write("[%-20s] %d%%" % ('=' * int(20 * j), 100 * j))
         sys.stdout.flush()
-        if i+1 == n:
-            sys.stdout.write('\n')
-            sys.stdout.flush()
 
     return

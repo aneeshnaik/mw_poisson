@@ -123,7 +123,6 @@ class MilkyWay:
 
         return
 
-
     def __create_potacc_interpolators(self, r, theta, pot):
 
         q = np.log(r)

@@ -1,25 +1,41 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SUMMARY HERE.
+Various density functions.
 
-Created: Wed Jul  8 11:09:49 2020
+Created: July 2020
 Author: A. P. Naik
-Description: DESCRIPTION HERE.
 """
 import numpy as np
-from .constants import pc, kpc, M_sun
 from .util import sech
 
 
-def rho_sph(pos, **kwargs):
-    alpha = kwargs['alpha']
-    beta = kwargs['beta']
-    q = kwargs['q']
-    r_cut = kwargs['r_cut']
-    r_0 = kwargs['r_0']
-    rho_0 = kwargs['rho_0']
+def rho_sph(pos, alpha, beta, q, r_cut, r_0, rho_0):
+    """
+    Density of spheroid.
 
+    Parameters
+    ----------
+    pos : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        3D Cartesian positions at which to evaluate density. UNITS: m
+    alpha : float
+        Outer slope.
+    beta : float
+        Inner slope.
+    q : float
+        Flattening
+    r_cut : float
+        Exponential cutoff radius. UNITS: m
+    r_0 : float
+        Scale radius. UNITS: m
+    rho_0 : float
+        Scale density. UNITS: kg / m^3
+
+    Returns
+    -------
+    rho : array, shape (N) or (N1, N2, N3, ...)
+        Density at given positions. UNITS: kg / m^3
+    """
     # get flattened radius coordinate
     x = pos[..., 0]
     y = pos[..., 1]
@@ -32,11 +48,25 @@ def rho_sph(pos, **kwargs):
     return rho
 
 
-def zeta(z, **kwargs):
-    """Vertical density profile of exponential or sech^2 disc."""
-    z_0 = kwargs['z_0']
-    form = kwargs['form']
+def zeta(z, z_0, form, **kwargs):
+    """
+    Normalised vertical density of exponential or sech^2 disc.
 
+    Parameters
+    ----------
+    z : array, shape (N) or (N1, N2, N3, ...)
+        Heights at which to evaluate density. UNITS: m
+    z_0 : float
+        Scale height of disc. UNITS: m
+    form : string, 'exponential' or 'sech'
+        Scale density. UNITS: kg / m^3
+
+    Returns
+    -------
+    h : array, shape (N) or (N1, N2, N3, ...)
+        Density at given scale height, normalised such that integral over z
+        equals 1. UNITS: m^-1.
+    """
     if form == 'exponential':
         const = (1 / (2 * z_0))
         h = const * np.exp(-np.abs(z) / z_0)

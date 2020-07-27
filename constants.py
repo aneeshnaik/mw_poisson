@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Physical constants and unit conversions. All SI units.
+
 Created: April 2019
 Author: A. P. Naik
-Description: Physical constants and unit conversions, for general use. All SI
-units.
 """
 
 # constants
