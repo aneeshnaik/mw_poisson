@@ -24,8 +24,6 @@ from .constants import kpc, pi, M_sun, G
 from .util import print_progress
 from .profiles import sigma, sigma_p, sigma_pp, zeta, bigH, bigH_p, rho_sph
 from scipy.special import sph_harm
-from scipy.interpolate import RectBivariateSpline as RBS
-import sys
 
 
 def potential_disc(pos, ndiscs, dpars):
@@ -139,26 +137,3 @@ def rho_effective(pos, ndiscs, dpars, nspheroids, spars):
         rho += t1 + t2 + t3
 
     return rho
-
-
-def solve_potential(ndiscs, dpars, nspheroids, spars,
-                    l_max=80, N_q=2001, N_theta=2500,
-                    r_min=1e-4 * kpc, r_max=1e+4 * kpc, verbose=False):
-
-    # get spherical coords and potential from multipole expansion
-    r, theta, pot_ME = potential_sh(ndiscs, dpars, nspheroids, spars,
-                                    l_max, N_q, N_theta,
-                                    r_min, r_max, verbose=verbose)
-
-    # convert to Cartesians and add disc component
-    r_grid, theta_grid = np.meshgrid(r, theta, indexing='ij')
-    x_grid = r_grid * np.sin(theta_grid)
-    y_grid = np.zeros_like(x_grid)
-    z_grid = r_grid * np.cos(theta_grid)
-    pos_edge = np.stack((x_grid, y_grid, z_grid), axis=-1)
-    pot = potential_disc(pos_edge, ndiscs, dpars) + pot_ME
-
-    return r, theta, pot
-
-
-
