@@ -3,6 +3,8 @@
 """
 Various density functions.
 
+See README for further details about mw_poisson and usage examples.
+
 Created: July 2020
 Author: A. P. Naik
 """
@@ -58,14 +60,14 @@ def zeta(z, z_0, form, **kwargs):
         Heights at which to evaluate density. UNITS: m
     z_0 : float
         Scale height of disc. UNITS: m
-    form : string, 'exponential' or 'sech'
+    form : string, {'exponential','sech'}
         Scale density. UNITS: kg / m^3
 
     Returns
     -------
     h : array, shape (N) or (N1, N2, N3, ...)
         Density at given scale height, normalised such that integral over z
-        equals 1. UNITS: m^-1.
+        equals 1. UNITS: m^-1
     """
     if form == 'exponential':
         const = (1 / (2 * z_0))
@@ -80,11 +82,24 @@ def zeta(z, z_0, form, **kwargs):
     return h
 
 
-def bigH(z, **kwargs):
-    """Equivalent to second integral of zeta_expdisc; 0 in disc-plane."""
-    z_0 = kwargs['z_0']
-    form = kwargs['form']
+def bigH(z, z_0, form, **kwargs):
+    """
+    Second integral of zeta function above.
 
+    Parameters
+    ----------
+    z : array, shape (N) or (N1, N2, N3, ...)
+        Heights at which to evaluate density. UNITS: m
+    z_0 : float
+        Scale height of disc. UNITS: m
+    form : string, {'exponential','sech'}
+        Scale density. UNITS: kg / m^3
+
+    Returns
+    -------
+    H : array, shape (N) or (N1, N2, N3, ...)
+        H function at given scale height. UNITS: m
+    """
     if form == 'exponential':
         const = z_0 / 2
         x = np.abs(z) / z_0
@@ -98,11 +113,24 @@ def bigH(z, **kwargs):
     return H
 
 
-def bigH_p(z, **kwargs):
-    """First derivative of bigH function above."""
-    z_0 = kwargs['z_0']
-    form = kwargs['form']
+def bigH_p(z, z_0, form, **kwargs):
+    """
+    First derivative of bigH function above.
 
+    Parameters
+    ----------
+    z : array, shape (N) or (N1, N2, N3, ...)
+        Heights at which to evaluate. UNITS: m
+    z_0 : float
+        Scale height of disc. UNITS: m
+    form : string, {'exponential','sech'}
+        Scale density. UNITS: kg / m^3
+
+    Returns
+    -------
+    H_p : array, shape (N) or (N1, N2, N3, ...)
+        H_p function at given scale height. UNITS: dimensionless
+    """
     if form == 'exponential':
         H_p = np.zeros_like(z)
         mask = z != 0
@@ -115,34 +143,76 @@ def bigH_p(z, **kwargs):
     return H_p
 
 
-def sigma(R, **kwargs):
-    """Surface density of exponential disc with central hole."""
-    sigma_0 = kwargs['sigma_0']
-    R_0 = kwargs['R_0']
-    R_h = kwargs['R_h']
+def sigma(R, sigma_0, R_0, R_h, **kwargs):
+    """
+    Surface density of exponential disc with central hole.
 
+    Parameters
+    ----------
+    R : array, shape (N) or (N1, N2, N3, ...)
+        Cylindrical radii at which to evaluate.
+    sigma_0 : float
+        Density normalisation. UNITS: kg/m^2
+    R_0 : float
+        Scale radius. UNITS: m
+    R_h : float
+        Hole radius. UNITS: m
+
+    Returns
+    -------
+    sig : array, shape (N) or (N1, N2, N3, ...)
+        Surface density of disc at given radii. UNITS: kg/m^2
+    """
     x = (R_h / R) + (R / R_0)
     sig = sigma_0 * np.exp(-x)
     return sig
 
 
-def sigma_p(R, **kwargs):
-    """1st deriv. of surface density of exponential disc with central hole."""
-    sigma_0 = kwargs['sigma_0']
-    R_0 = kwargs['R_0']
-    R_h = kwargs['R_h']
+def sigma_p(R, sigma_0, R_0, R_h, **kwargs):
+    """
+    First derivative of sigma function above.
 
+    Parameters
+    ----------
+    R : array, shape (N) or (N1, N2, N3, ...)
+        Cylindrical radii at which to evaluate.
+    sigma_0 : float
+        Density normalisation. UNITS: kg/m^2
+    R_0 : float
+        Scale radius. UNITS: m
+    R_h : float
+        Hole radius. UNITS: m
+
+    Returns
+    -------
+    sig_p : array, shape (N) or (N1, N2, N3, ...)
+        d(sigma)/dR at given radii. UNITS: kg/m^3
+    """
     x = (R_h / R) + (R / R_0)
     sig = -(sigma_0 / R_0) * np.exp(-x) * (1 - (R_h * R_0 / R**2))
     return sig
 
 
-def sigma_pp(R, **kwargs):
-    """2nd deriv. of surface density of exponential disc with central hole."""
-    sigma_0 = kwargs['sigma_0']
-    R_0 = kwargs['R_0']
-    R_h = kwargs['R_h']
+def sigma_pp(R, sigma_0, R_0, R_h, **kwargs):
+    """
+    Second derivative of sigma function above.
 
+    Parameters
+    ----------
+    R : array, shape (N) or (N1, N2, N3, ...)
+        Cylindrical radii at which to evaluate.
+    sigma_0 : float
+        Density normalisation. UNITS: kg/m^2
+    R_0 : float
+        Scale radius. UNITS: m
+    R_h : float
+        Hole radius. UNITS: m
+
+    Returns
+    -------
+    sig_pp : array, shape (N) or (N1, N2, N3, ...)
+        d^2(sigma)/dR^2 at given radii. UNITS: kg/m^4
+    """
     x = (R_h / R) + (R / R_0)
     fac = (1 - R_h * R_0 / R**2)**2 - 2 * R_h * R_0**2 / R**3
     sig = (sigma_0 / R_0**2) * np.exp(-x) * fac

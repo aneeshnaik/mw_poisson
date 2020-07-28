@@ -3,6 +3,8 @@
 """
 Various useful functions for mw_poisson package.
 
+See README for further details about mw_poisson and usage examples.
+
 Created: July 2020
 Author: A. P. Naik
 """

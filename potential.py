@@ -1,23 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Calculate gravitational potential associated with McMillan (2017) MW model.
+Various functions used to solve Poisson's equation.
 
-Created: Tue Jun 30 09:41:12 2020
+See README for further details about mw_poisson and usage examples.
+
+Created: July 2020
 Author: A. P. Naik
-Description: Using the disc decomposition + spherical harmonic expansion method
-described in Dehnen and Binney (1998), solve for the gravitational potential
-associated with the McMillan (2017) 4-component model of the Milky Way. This
-essentially is a pure python version of McMillan's GalPot code.
-
-In a nutshell, the potential for a given discoid mass distribution is
-decomposed into an analytic disc component (here calculated by the
-'potential_disc' function below), and another component given by solving
-Poisson's equation for an 'effective' density. This effective density is much
-less confined to the disc plane than the original density, so a spherical
-harmonic method can be used much more inexpensively than if it were used on the
-original mass distribution. The effective density is given by 'rho_effective'
-below, and the spherical harmonic solver is in 'potential_sh'.
 """
 import numpy as np
 from .constants import kpc, pi, M_sun, G
@@ -27,7 +16,25 @@ from scipy.special import sph_harm
 
 
 def potential_disc(pos, ndiscs, dpars):
-    """Calculate analytic disc-plane component of the potential."""
+    """
+    Calculate analytic disc-plane component of the potential.
+
+    Parameters
+    ----------
+    pos : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        Positions at which to evaluate potential, in 3D Galactocentric
+        Cartesian coordinates. UNITS: m
+    ndiscs : int
+        Number of disc components in galaxy.
+    dpars : list of dicts, length ndiscs
+        See 'MilkyWay' class documentation for more info about dpars.
+
+    Returns
+    -------
+    phi_d : array, shape (N) or (N1, N2, N3, ...)
+        Potentials at given positionss. UNITS: m^2 / s^2
+
+    """
     # get z and spherical radius r from pos
     z = pos[..., 2]
     r = np.linalg.norm(pos, axis=-1)
@@ -40,8 +47,35 @@ def potential_disc(pos, ndiscs, dpars):
 
 
 def potential_sh(ndiscs, dpars, nspheroids, spars, l_max, N_q, N_theta,
-                 r_min, r_max, verbose=False):
-    """Calculate potential using spherical harmonic expansion."""
+                 r_min, r_max, verbose):
+    """
+    Calculate potential using spherical harmonic expansion.
+
+    Parameters
+    ----------
+    ndiscs : int
+        Number of disc components in galaxy.
+    dpars : list of dicts, length ndiscs
+        See 'MilkyWay' class documentation for more info about dpars.
+    nspheroids : int
+        Number of spheroidal components in galaxy.
+    spars : list of dicts
+        See 'MilkyWay' class documentation for more info about dpars.
+
+    The remaining parameters are exactly those of the MilkyWay.solve_potential
+    class method; see documentation there for more info about the parameters.
+
+    Returns
+    -------
+    r : array, shape (N_q)
+        Array of spherical radii at which potential is calculated. UNITS: m
+    theta : array, shape (N_theta)
+        Array of polar angles at which potential is calculated. UNITS: radians
+    pot : array, shape (N_q, N_theta)
+        Potential obtained from spherical harmonic expansion, on a spherical
+        grid. UNITS: m^2/s^2
+
+    """
     # convert distances to kpc to give more tractable numbers
     r_min /= kpc
     r_max /= kpc
@@ -105,7 +139,27 @@ def potential_sh(ndiscs, dpars, nspheroids, spars, l_max, N_q, N_theta,
 
 
 def rho_effective(pos, ndiscs, dpars, nspheroids, spars):
-    """Effective density to feed to spherical harmonic solver."""
+    """
+    At given positions, calculate effective density for spher. harmonic solver.
+
+    Parameters
+    ----------
+    pos : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        3D Cartesian positions at which to evaluate density. UNITS: m
+    ndiscs : int
+        Number of disc components in galaxy.
+    dpars : list of dicts, length ndiscs
+        See 'MilkyWay' class documentation for more info about dpars.
+    nspheroids : int
+        Number of spheroidal components in galaxy.
+    spars : list of dicts
+        See 'MilkyWay' class documentation for more info about dpars.
+
+    Returns
+    -------
+    rho : array, shape (N) or (N1, N2, N3, ...)
+        Effective density at given positions. UNITS: kg / m^3
+    """
     # get cylindrical and spherical radii from pos
     x = pos[..., 0]
     y = pos[..., 1]
