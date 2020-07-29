@@ -10,7 +10,7 @@ Author: A. P. Naik
 """
 import numpy as np
 from scipy.interpolate import RectBivariateSpline as RBS, interp1d
-from .constants import kpc, pi
+from .constants import kpc, pi, G
 from .potential import potential_disc, potential_sh
 from .profiles import rho_sph, zeta, sigma
 
@@ -39,6 +39,12 @@ class MilkyWay:
     spars : list of dicts
         Each dict should contain 6 items, as specified in 'Spheroid Parameters'
         below.
+    r_min : float, optional
+        Inner limit of radial integration and various interpolators. The
+        default is 1e-4 * kpc. UNITS: m
+    r_max : float, optional
+        Outer limit of radial integration and various interpolators. The
+        default is 1e+4 * kpc. UNITS: m
 
     Disc Parameters
     ---------------
@@ -83,17 +89,20 @@ class MilkyWay:
         Evaluate enclosed spherical mass at given positions.
     """
 
-    def __init__(self, ndiscs, dpars, nspheroids, spars):
+    def __init__(self, ndiscs, dpars, nspheroids, spars,
+                 r_min=1e-4 * kpc, r_max=1e+4 * kpc):
         self.ndiscs = ndiscs
         self.dpars = dpars
         self.nspheroids = nspheroids
         self.spars = spars
+        self.r_min = r_min
+        self.r_max = r_max
         self.SolnFlag = False
         self.__create_mass_interpolator()
         return
 
     def solve_potential(self, l_max=80, N_q=2001, N_theta=2500,
-                        r_min=1e-4 * kpc, r_max=1e+4 * kpc, verbose=False):
+                        verbose=False):
         """
         Solve for the gravitational potential.
 
@@ -109,12 +118,6 @@ class MilkyWay:
             Number of polar angular bins for angular integration. Needs to be
             an even number so that acceleration is evaluated on disc-plane.
             The default is 2500.
-        r_min : float, optional
-            Inner limit of radial integration. The default is 1e-4 * kpc.
-            UNITS: m
-        r_max : float, optional
-            Outer limit of radial integration. The default is 1e+4 * kpc.
-            UNITS: m
         verbose : bool, optional
             Whether to print progress bar in spherical harmonic expansion. The
             default is False.
@@ -130,7 +133,8 @@ class MilkyWay:
         r, theta, pot_ME = potential_sh(self.ndiscs, self.dpars,
                                         self.nspheroids, self.spars,
                                         l_max, N_q, N_theta,
-                                        r_min, r_max, verbose=verbose)
+                                        self.r_min, self.r_max,
+                                        verbose=verbose)
 
         # convert to Cartesians
         r_grid, theta_grid = np.meshgrid(r, theta, indexing='ij')
@@ -151,14 +155,17 @@ class MilkyWay:
         return
 
     def __create_mass_interpolator(self):
-        """Set up self.__f_lnmass function, which interpolates mass."""
+        """Set up self.__f_lnmass function, which interpolates mass.
+
+        Note: Inside self.r_min M_enc=0, outside self.r_max, M_enc=M_enc(r_max)
+        """
         N_q = 2000  # number of cells in radial dimension
         N_th = 2000  # number of cells in theta dimension
-        r_min = 1e-4 * kpc
-        r_max = 1e+4 * kpc
 
         # set up r grid
-        q_edges = np.linspace(np.log(r_min), np.log(r_max), num=N_q + 1)
+        q_min = np.log(self.r_min)
+        q_max = np.log(self.r_max)
+        q_edges = np.linspace(q_min, q_max, num=N_q + 1)
         q_cen = 0.5 * (q_edges[1:] + q_edges[:-1])
         dq = np.diff(q_edges)[0]
 
@@ -182,7 +189,8 @@ class MilkyWay:
         lnM_enc = np.log(np.cumsum(dMshell))
 
         self.__f_lnmass = interp1d(q_edges[1:], lnM_enc, bounds_error=False,
-                                   fill_value=(0, lnM_enc[-1]))
+                                   fill_value=(-np.inf, lnM_enc[-1]))
+        self.M_max = np.exp(lnM_enc[-1])
 
         return
 
@@ -232,15 +240,19 @@ class MilkyWay:
         """
         Interpolate potential at given positions.
 
+        If r > self.r_max (1e+4 kpc by default) than GM/r law is assumed, where
+        M is M(r_max). If r < self.r_min (1e+4 kpc by default) then
+        pot = pot(r_min).
+
         Parameters
         ----------
-        pos : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        pos : array, shape (3) or (N, 3) or (N1, N2, N3, ..., 3)
             Positions at which to evaluate potential, in 3D Galactocentric
             Cartesian coordinates. UNITS: m
 
         Returns
         -------
-        pot : array, shape (N) or (N1, N2, N3, ...)
+        pot : float or array, shape (N) or (N1, N2, N3, ...)
             Potentials at given positionss. UNITS: m^2 / s^2
         """
         # check potential solution exists
@@ -253,21 +265,38 @@ class MilkyWay:
 
         # interpolate potential
         pot = self.__f_pot.ev(q, theta)
+
+        # if only one position supplied, return float, not array
+        if pos.ndim == 1:
+            pot = float(pot)
+
+        # extrapolate GM/r law beyond self.r_max
+        M = self.M_max
+        if pos.ndim == 1:
+            if r > self.r_max:
+                pot += G * M / self.r_max - G * M / r
+        else:
+            mask = r > self.r_max
+            pot[mask] += G * M / self.r_max - G * M / r[mask]
+
         return pot
 
     def acceleration(self, pos):
         """
         Interpolate acceleration at given positions.
 
+        if r > self.r_max (1e+4 kpc by default) than GM/r^2 law is assumed,
+        where M is M(r_max). If r < self.r_min (1e+4 kpc by default) then a=0.
+
         Parameters
         ----------
-        pos : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        pos : array, shape (3) or (N, 3) or (N1, N2, N3, ..., 3)
             Positions at which to evaluate acceleration, in 3D Galactocentric
             Cartesian coordinates. UNITS: m
 
         Returns
         -------
-        acc : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        acc : array, shape (3) or (N, 3) or (N1, N2, N3, ..., 3)
             Accelerations at given positions, in 3D Galactocentric
             Cartesian coordinates. UNITS: m / s^2
         """
@@ -297,6 +326,15 @@ class MilkyWay:
         # stack ax ay az
         a = np.stack((ax, ay, az), axis=-1)
 
+        # extrapolate GM/r^2 law beyond self.r_max
+        M = self.M_max
+        if pos.ndim == 1:
+            if r > self.r_max:
+                a = - G * M * pos / r**3
+        else:
+            mask = r > self.r_max
+            a[mask] = - G * M * pos[mask] / r[mask, None]**3
+
         return a
 
     def density(self, pos):
@@ -305,13 +343,13 @@ class MilkyWay:
 
         Parameters
         ----------
-        pos : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        pos : array, shape (3) or (N, 3) or (N1, N2, N3, ..., 3)
             Positions at which to evaluate density, in 3D Galactocentric
             Cartesian coordinates. UNITS: m
 
         Returns
         -------
-        rho : array, shape (N) or (N1, N2, N3, ...)
+        rho : float or array, shape (N) or (N1, N2, N3, ...)
             Densities at given positions. UNITS: kg/m^3
         """
         # get cylindrical and spherical radii from pos
@@ -329,21 +367,27 @@ class MilkyWay:
         for i in range(self.ndiscs):
             rho += sigma(R, **self.dpars[i]) * zeta(z, **self.dpars[i])
 
+        # if only one position supplied, return float, not array
+        if pos.ndim == 1:
+            rho = float(rho)
+
         return rho
 
     def mass_enclosed(self, pos):
         """
         Evaluate enclosed spherical mass at given positions.
 
+        Note: Inside self.r_min M_enc=0, outside self.r_max, M_enc=M_enc(r_max)
+
         Parameters
         ----------
-        pos : array, shape (N, 3) or (N1, N2, N3, ..., 3)
+        pos : array, shape (3) or (N, 3) or (N1, N2, N3, ..., 3)
             Positions at which to evaluate mass, in 3D Galactocentric
             Cartesian coordinates. UNITS: m
 
         Returns
         -------
-        mass : array, shape (N) or (N1, N2, N3, ...)
+        mass : float or array, shape (N) or (N1, N2, N3, ...)
             Enclosed spherical mass at given positions. UNITS: kg
         """
         r = np.linalg.norm(pos, axis=-1)
