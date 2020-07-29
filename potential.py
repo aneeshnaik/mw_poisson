@@ -17,7 +17,7 @@ from scipy.special import sph_harm
 
 def potential_disc(pos, ndiscs, dpars):
     """
-    Calculate analytic disc-plane component of the potential.
+    Calculate analytic disc-plane component of the potential (theory.pdf eq.6).
 
     Parameters
     ----------
@@ -49,7 +49,7 @@ def potential_disc(pos, ndiscs, dpars):
 def potential_sh(ndiscs, dpars, nspheroids, spars, l_max, N_q, N_theta,
                  r_min, r_max, verbose):
     """
-    Calculate potential using spherical harmonic expansion.
+    Calculate potential using spherical harmonic expansion (theory.pdf eq.13).
 
     Parameters
     ----------
@@ -140,7 +140,7 @@ def potential_sh(ndiscs, dpars, nspheroids, spars, l_max, N_q, N_theta,
 
 def rho_effective(pos, ndiscs, dpars, nspheroids, spars):
     """
-    At given positions, calculate effective density for spher. harmonic solver.
+    Calculate effective density SH solver (theory.pdf eq.8).
 
     Parameters
     ----------

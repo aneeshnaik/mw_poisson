@@ -132,12 +132,14 @@ class MilkyWay:
                                         l_max, N_q, N_theta,
                                         r_min, r_max, verbose=verbose)
 
-        # convert to Cartesians and add analytic disc component
+        # convert to Cartesians
         r_grid, theta_grid = np.meshgrid(r, theta, indexing='ij')
         x_grid = r_grid * np.sin(theta_grid)
         y_grid = np.zeros_like(x_grid)
         z_grid = r_grid * np.cos(theta_grid)
         pos = np.stack((x_grid, y_grid, z_grid), axis=-1)
+
+        # add analytic disc component (theory.pdf eq.6)
         pot = potential_disc(pos, self.ndiscs, self.dpars) + pot_ME
 
         # create interpolating functions for potential and acceleration

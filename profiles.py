@@ -14,7 +14,7 @@ from .util import sech
 
 def rho_sph(pos, alpha, beta, q, r_cut, r_0, rho_0):
     """
-    Density of spheroid.
+    Density of spheroid (theory.pdf eq.15).
 
     Parameters
     ----------
@@ -52,7 +52,7 @@ def rho_sph(pos, alpha, beta, q, r_cut, r_0, rho_0):
 
 def zeta(z, z_0, form, **kwargs):
     """
-    Normalised vertical density of exponential or sech^2 disc.
+    Normalised vertical density of disc (theory.pdf eq.19 or 22).
 
     Parameters
     ----------
@@ -61,7 +61,7 @@ def zeta(z, z_0, form, **kwargs):
     z_0 : float
         Scale height of disc. UNITS: m
     form : string, {'exponential','sech'}
-        Scale density. UNITS: kg / m^3
+        Whether to use exponential or sech^2 vertical profile (see theory.pdf).
 
     Returns
     -------
@@ -84,7 +84,7 @@ def zeta(z, z_0, form, **kwargs):
 
 def bigH(z, z_0, form, **kwargs):
     """
-    Second integral of zeta function above.
+    Second integral of zeta function above (theory.pdf eq.20 or 23).
 
     Parameters
     ----------
@@ -93,7 +93,7 @@ def bigH(z, z_0, form, **kwargs):
     z_0 : float
         Scale height of disc. UNITS: m
     form : string, {'exponential','sech'}
-        Scale density. UNITS: kg / m^3
+        Whether to use exponential or sech^2 vertical profile (see theory.pdf).
 
     Returns
     -------
@@ -115,7 +115,7 @@ def bigH(z, z_0, form, **kwargs):
 
 def bigH_p(z, z_0, form, **kwargs):
     """
-    First derivative of bigH function above.
+    First derivative of bigH function above (theory.pdf eq.21 or 24).
 
     Parameters
     ----------
@@ -124,7 +124,7 @@ def bigH_p(z, z_0, form, **kwargs):
     z_0 : float
         Scale height of disc. UNITS: m
     form : string, {'exponential','sech'}
-        Scale density. UNITS: kg / m^3
+        Whether to use exponential or sech^2 vertical profile (see theory.pdf).
 
     Returns
     -------
@@ -145,7 +145,7 @@ def bigH_p(z, z_0, form, **kwargs):
 
 def sigma(R, sigma_0, R_0, R_h, **kwargs):
     """
-    Surface density of exponential disc with central hole.
+    Surface density of exponential disc with central hole (theory.pdf eq.16).
 
     Parameters
     ----------
@@ -170,7 +170,7 @@ def sigma(R, sigma_0, R_0, R_h, **kwargs):
 
 def sigma_p(R, sigma_0, R_0, R_h, **kwargs):
     """
-    First derivative of sigma function above.
+    First derivative of sigma function above (theory.pdf eq.17).
 
     Parameters
     ----------
@@ -195,7 +195,7 @@ def sigma_p(R, sigma_0, R_0, R_h, **kwargs):
 
 def sigma_pp(R, sigma_0, R_0, R_h, **kwargs):
     """
-    Second derivative of sigma function above.
+    Second derivative of sigma function above (theory.pdf eq.18).
 
     Parameters
     ----------
