@@ -1,0 +1,187 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[vmargin=15mm,hmargin=20mm]{geometry}     % margins
+\usepackage{natbib}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{bm}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\setlength{\parskip}{\baselineskip}
+\DeclareMathOperator{\sech}{sech}
+
+\title{\texttt{mw\_poisson}: Mathematical Background}
+\author{A. P. Naik}
+\date{July 2020}
+
+\begin{document}
+
+\maketitle
+
+
+This document details some of the mathematics underpinning the \texttt{mw\_poisson} package, and provides further references. \texttt{mw\_poisson} is a python-3 package providing a Poisson solver for the (axisymmetric) Milky Way potential, essentially a vectorised, python alternative to \href{https://github.com/PaulMcMillan-Astro/GalPot}{GalPot}.
+
+The Poisson solver is based on the method described in \citet{Dehnen1998}, designed for the solution of Poisson's equation in the context of an axisymmetric discoid mass distribution.
+
+The parameterisation of the Milky Way density profile is the empirical model of \citet{McMillan2017}. As well as the best-fitting model of \citet{McMillan2017}, other parameter values for the various components can also be adopted, including some 'meta-parameters' such as the slope of the dark matter halo.
+
+
+\section{Spheroid-Disc Decomposition}
+
+Given some model for the density distribution $\rho(\bm{x})$ of our Galaxy, our goal is to calculate the corresponding gravitational potential $\Phi(\bm{x})$ by solving Poisson's equation
+\begin{equation}
+    \nabla^2 \Phi = 4\pi G \rho.
+\end{equation}
+One way to go about this would be to perform a direct spherical harmonic expansion. However, such methods can be slow to converge if a component is strongly confined to the disc plane. Fortunately, \citet{Dehnen1998} describe an alternative method that can be employed in such circumstances, provided the density distribution is axisymmetric. In a nutshell, the potential is decomposed into an analytic disc-plane component, plus another component that needs to be calculated numerically. This latter component is less strongly confined to the disc plane, and so the spherical harmonic expansion method is more effective.
+
+For the method to work, we require that $\rho(\bm{x})$ can be written as a linear combination of various discoid and spheroid components, i.e.
+\begin{equation}
+    \rho = \sum_i \rho_{d,i} + \sum_j \rho_{s,j},
+\end{equation}
+where the spheroids $\rho_{s,j}$ need not be spherically symmetric, just not too strongly confined to the disc plane. The discoid components $\rho_{d,i}$ must be separable, i.e. it can be written as
+\begin{equation}
+\label{E:rho_disc}
+    \rho_{d,i}(R,z) = \Sigma_i(R)\zeta_i(z),
+\end{equation}
+where the normalisation is such that
+\begin{equation}
+\label{E:zeta_norm}
+    \int_{-\infty}^{-\infty} \zeta(z) dz = 1.
+\end{equation}
+
+Then, the potential can be written as
+\begin{equation}
+    \Phi = \Phi_\mathrm{ME} + \Phi_\mathrm{disc},
+\end{equation}
+where $\Phi_\mathrm{disc}$ can be written analytically as
+\begin{equation}
+    \Phi_\mathrm{disc} = 4\pi G \sum_i \Sigma_i(r)H_i(z),
+\end{equation}
+and $H(z)$ is a function that satisfies $H''(z) = \zeta(z)$ and $H'(0)=H(0)=0$. Note that the argument of $\Sigma$ here is the spherical radius $r$ rather than the cylindrical radius $R$.
+
+Meanwhile, the other component $\Phi_\mathrm{ME}$ solves a new Poisson equation
+\begin{equation}
+\label{E:PoissonME}
+    \nabla^2 \Phi_\mathrm{ME} = 4\pi G \rho_\mathrm{ME},
+\end{equation}
+where the `density' is given by
+\begin{equation}
+\label{E:rho_ME}
+    \rho_\mathrm{ME} \equiv \sum_i \left[\left(\Sigma_i(R)-\Sigma_i(r)\right)\zeta_i(z) - \Sigma_i''(r)H_i(z) - \frac{2}{r}\Sigma_i'(r)\left(H_i(z) + zH_i'(z)\right)\right] + \sum_j \rho_{s,j}.
+\end{equation}
+As required, this is less strongly confined to the disc-plane than the true density (e.g., $\rho_\mathrm{ME}=0$ in the disc-plane). Thus, a spherical harmonic expansion for will converge quickly on a solution for Eq. (\ref{E:PoissonME}). This spherical harmonic method is the subject of the next section.
+
+\section{Spherical Harmonic Solver}
+
+According to \citet[][Eq. 2.95]{Binney2008}, a gravitational potential $\Phi$ can be expanded in terms of spherical harmonics $Y_l^m$ as
+\begin{equation}
+\label{E:phi_sh_full}
+    \Phi(r, \theta, \phi) = - 4\pi G \sum_{l=0}^\infty \sum_{m=-l}^l \frac{Y_l^m(\theta,\phi)}{2l+1}\left(r^{-l-1}\int_0^r dr' r'^{l+2} \rho_{lm}(r')+ r^l\int_r^\infty dr' r'^{1-l} \rho_{lm}(r') \right),
+\end{equation}
+where the density coefficient $\rho_{lm}(r)$ relates to a given density distribution $\rho(\bm{x})$ via
+\begin{equation}
+\label{E:rholm}
+    \rho_{lm}(r) \equiv \int_0^\pi d\theta \sin(\theta) \int_0^{2\pi} d\phi Y_l^{m*}(\theta,\phi)\rho(r, \theta, \phi).
+\end{equation}
+Note that $Y_l^{m*}$ is the complex conjugate of $Y_l^{m}$.
+
+Because $Y_l^{m*} \propto e^{-i m \phi}$, if an axisymmetric density distribution is assumed then the $\phi$ integral in Eq. (\ref{E:rholm}) vanishes for $m \neq 0$. The expression for the gravitational potential (\ref{E:phi_sh_full}) then simplifies to
+\begin{equation}
+    \Phi(r, \theta) = - 4\pi G \sum_{l=0}^\infty \frac{Y_l^0(\theta)}{2l+1}\left(r^{-l-1}\int_0^r dr' r'^{l+2} \rho_{l0}(r')+ r^l\int_r^\infty dr' r'^{1-l} \rho_{l0}(r') \right).
+\end{equation}
+
+Finer resolution is required in the central regions the galaxy than at larger distances, so it is convenient to instead use $q \equiv \ln r$ as the coordinate in the radial integration. Then,
+\begin{equation}
+    \Phi(r, \theta) = - 4\pi G \sum_{l=0}^\infty \frac{Y_l^0(\theta)}{2l+1}\left(r^{-l-1}\int_0^{\ln r} dq e^{(l+3)q} \rho_{l0}(q)+ r^l\int_{\ln r}^\infty dq e^{(2-l)q} \rho_{l0}(r') \right).
+\end{equation}
+
+To calculate $\Phi(r, \theta)$ numerically, one can construct a regular coordinate grid in $q$ and $\theta$, i.e., using \texttt{python}-indexing: $q \rightarrow \{q_0, q_1, q_2, ..., q_{M-1}\}$ and $\theta \rightarrow \{\theta_0, \theta_1, \theta_2, ..., \theta_{N-1}\}$, respectively with constant grid spacings $h_q$ and $h_\theta$. The $\theta$ grid spans $0$ to $\pi$, while $q$ is bounded by some minimum and maximum radius chosen by hand, ensuring the full dynamic range of the galaxy is captured. Converting the integrals to discrete sums, one then obtains
+\begin{equation}
+    \Phi(r_i, \theta_j) = - 8\pi^2 G h_q h_\theta \sum_{l=0}^\infty \frac{Y_l^0(\theta_j)}{2l+1} C_i^l,
+\end{equation}
+\begin{equation}
+    C_i^l \equiv r_i^{-l-1}\sum_{a=0}^{i}\sum_b e^{(l+3)q_a} Y_l^{0*}(\theta_b) \sin(\theta_b) \rho(r_a, \theta_b) + r_i^l\sum_{a=i+1}^{M-1}\sum_b e^{(2-l)q_a} Y_l^{0*}(\theta_b) \sin(\theta_b) \rho(r_a, \theta_b).
+\end{equation}
+Of course in practice, one must truncate the sum over $l$ at some value.
+
+
+
+
+
+
+
+\section{Parametric Models}
+
+\subsection{Spheroid}
+
+For the spheroidal components of the galaxy (e.g. bulge, halo), the program assumes the following axisymmetric form for the density profile:
+\begin{equation}
+\label{E:rho_spheroid}
+    \rho_s(R,z) = \frac{\rho_0}{\left(\frac{r'}{r_0}\right)^\beta\left(1+\frac{r'}{r_0}\right)^\alpha}e^{-\left(\frac{r'}{r_\mathrm{cut}}\right)^2},
+\end{equation}
+where $r' \equiv \sqrt{R^2 + (z/q)^2}$. The profile is thus specified by six parameters: the normalisation $\rho_0$, the outer slope $\alpha$, the inner slope $\beta$, the scale radius $r_0$, the cutoff radius $r_\mathrm{cut}$, and the flattening $q$.
+
+An arbitrary number of such spheroids, with different parameter combinations can be included in the Poisson solver. Various commonly-used density profiles can be recovered from Eq. (\ref{E:rho_spheroid}) after some parameter specification. For instance, the NFW profile corresponds to $\beta=1, \alpha=2, r_\mathrm{cut}=\infty, q=1$.
+
+\citet{McMillan2017} use an axisymmetric Bissantz-Gerhard model for the Milky Way bulge, and an NFW profile for the dark matter halo. The best-fitting parameter values of these are reproduced in the table below.
+
+\begin{center}
+    \begin{tabular}{l c c c c c c}\toprule[1.5pt]
+    Component & \multicolumn{6}{c}{Parameter} \\
+              & $\rho_0$                & $\alpha$ & $\beta$ & $r_0$   & $r_\mathrm{cut}$ & $q$ \\
+              & $M_\odot/\mathrm{pc}^3$ & -        & -       & kpc     & kpc              & -   \\ \midrule[0.5pt]
+    Bulge     & 98.351                  & 1.8      & 0       & 0.075   & 2.1              & 0.5 \\
+    Halo      & 0.00853702              & 2        & 1       & 19.5725 & $\infty$         & 1   \\ \bottomrule[1.5pt]
+    \end{tabular}
+\end{center}
+
+\subsection{Disc}
+
+According to Eq. (\ref{E:rho_disc}), the disc density profile is specified by two functions, the radial surface density $\Sigma(R)$ and the vertical profile $\zeta(z)$. For $\Sigma(R)$, the program assumes a `holed' exponential disc, i.e.
+\begin{equation}
+    \Sigma(R) = \Sigma_0 e^{-x},
+\end{equation}
+where $x \equiv R_h/R+ R/R_0$, $\Sigma_0$ is the density normalisation, and $R_0$ and $R_h$ are respectively the scale radius and radius of the central hole. Equation \ref{E:rho_ME} requires expressions for the first and second derivatives of $\Sigma$. These are given by
+\begin{align}
+    \Sigma'(R)  & = -\frac{\Sigma_0}{R_0} e^{-x} \left(1 - \frac{R_h R_0}{R^2}\right) ,\\
+    \Sigma''(R) & = \frac{\Sigma_0}{R_0^2} e^{-x} \left[\left(1 - \frac{R_h R_0}{R^2}\right)^2 - \frac{2R_h R_0^2}{R^3}\right] .
+\end{align}
+
+Meanwhile, for the vertical profile $\zeta(z)$, the program can optionally adopt either an exponential or a sech\textsuperscript{2} profile. In the former case,
+\begin{equation}
+    \zeta(z) = \frac{1}{2z_0}e^{-\frac{|z|}{z_0}},
+\end{equation}
+where $z_0$ is the scale height of the disc. Note that the factor $1/2z_0$ ensures that Eq. (\ref{E:zeta_norm}) is satisfied, i.e. $\zeta$ is properly normalised. The corresponding functions $H(z)$ function and its first derivative $H'(z)$ are given by
+\begin{align}
+    H(z)  & = \frac{z_0}{2} \left(e^{-\frac{|z|}{z_0}} - 1 + \frac{|z|}{z_0}\right), \\
+    H'(z) & = \frac{z}{2z_0} \left(1 - e^{-\frac{|z|}{z_0}}\right).
+\end{align}
+It can be verified that $H''(z) = \zeta(z)$ and $H'(0)=H(0)=0$.
+
+For the sech\textsuperscript{2} profile, these functions are instead given by the following expressions, which also satisfy the various requirements:
+\begin{align}
+    \zeta(z) & = \frac{1}{4z_0}\sech^2\left(\frac{z}{2z_0}\right),\\
+    H(z)     & = z_0 \ln\left(\cosh\left(\frac{z}{2z_0}\right)\right), \\
+    H'(z)    & = \frac{1}{2} \tanh\left(\frac{z}{2z_0}\right).
+\end{align}
+
+Thus, the disc density is specified by the choice of vertical profile and four parameters: $\Sigma_0, R_0, R_h$, and $z_0$. As with the spheroids above, an arbitrary number of such discs with different parameter combinations can be included in the calculation.
+
+The Milky Way model of \citet{McMillan2017} incorporates four disc components: neutral and molecular hydrogen discs, and thin and thick stellar discs. The best-fitting parameters (and vertical shapes) of these discs are reproduced in the table below.
+
+\begin{center}
+    \begin{tabular}{l l c c c c}\toprule[1.5pt]
+    Component          & Vertical Profile & \multicolumn{4}{c}{Parameter} \\
+                       &                  & $\Sigma_0$              & $R_0$   & $R_h$ & $z_0$ \\
+                       &                  & $M_\odot/\mathrm{pc}^2$ & kpc     & kpc   & pc    \\ \midrule[0.5pt]
+    Thin               & Exponential      & 895.679                 & 2.49955 & 0     & 300   \\
+    Thick              & Exponential      & 183.444                 & 3.02134 & 0     & 900   \\
+    HI                 & $\sech^2$        & 53.1319                 & 7       & 4     & 85    \\
+    H\textsubscript{2} & $\sech^2$        & 2179.95                 & 1.5     & 12    & 45    \\ \bottomrule[1.5pt]
+    \end{tabular}
+\end{center}
+
+
+\bibliographystyle{mnras}
+\bibliography{library}
+
+
+\end{document}
