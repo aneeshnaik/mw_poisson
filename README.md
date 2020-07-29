@@ -64,3 +64,7 @@ In a similar manner, one can also access other quantities via `MilkyWay.accelera
 This code was written by **Aneesh Naik** ([website](https://aneeshnaik.github.io/)).
 
 ## License
+
+Copyright (2020) Aneesh Naik.
+
+`mw_poisson` is free software made available under the MIT license. For details see LICENSE.
