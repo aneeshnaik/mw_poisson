@@ -9,7 +9,7 @@ Created: July 2020
 Author: A. P. Naik
 """
 import numpy as np
-from scipy.interpolate import RectBivariateSpline as RBS, interp1d
+from scipy.interpolate import RectBivariateSpline as RBS, RegularGridInterpolator as RGI, interp1d
 from .constants import kpc, pi, G
 from .potential import potential_disc, potential_sh
 from .profiles import rho_sph, zeta, sigma
@@ -101,8 +101,7 @@ class MilkyWay:
         self.__create_mass_interpolator()
         return
 
-    def solve_potential(self, l_max=80, N_q=2001, N_theta=2500,
-                        verbose=False):
+    def solve_potential(self, l_max=80, N_q=4001, N_theta=2500, verbose=False):
         """
         Solve for the gravitational potential.
 
@@ -197,7 +196,7 @@ class MilkyWay:
     def __create_potacc_interpolators(self, r, theta, pot):
         """Set up interpolators for potential and acceleration."""
         q = np.log(r)
-        self.__f_pot = RBS(q, theta, pot)
+        self.__f_pot = RGI((q, theta), pot)
 
         # first derivs via finite differencing
         dpdq = np.diff(pot, axis=0) / np.diff(q)[:, None]
@@ -231,8 +230,8 @@ class MilkyWay:
         th_cen = np.hstack((0, th_cen, pi))
 
         # interpolators for cylindrical coords
-        self.__f_aR = RBS(q_cen, th_cen, -dpdR_new)
-        self.__f_az = RBS(q_cen, th_cen, -dpdz_new)
+        self.__f_aR = RGI((q_cen, th_cen), -dpdR_new)
+        self.__f_az = RGI((q_cen, th_cen), -dpdz_new)
 
         return
 
@@ -307,17 +306,16 @@ class MilkyWay:
         r = np.linalg.norm(pos, axis=-1)
         q = np.log(r)
         theta = np.arccos(pos[..., 2] / r)
+        xi = np.stack((q, theta), axis=-1)
 
-        # interpolate z accel
-        az = self.__f_az.ev(q, theta)
+        # interpolate accels
+        az = self.__f_az(xi)
+        aR = self.__f_aR(xi)
 
-        # interpolate R accel
+        # recast into x and y accels (zero when R=0)
         x = pos[..., 0]
         y = pos[..., 1]
         R = np.sqrt(x**2 + y**2)
-        aR = self.__f_aR.ev(q, theta)
-
-        # recast into x and y accels (zero when R=0)
         ax = np.zeros_like(aR)
         ay = np.zeros_like(aR)
         ax[R != 0] = aR[R != 0] * x[R != 0] / R[R != 0]
