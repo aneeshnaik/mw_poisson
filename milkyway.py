@@ -9,7 +9,7 @@ Created: July 2020
 Author: A. P. Naik
 """
 import numpy as np
-from scipy.interpolate import RectBivariateSpline as RBS, RegularGridInterpolator as RGI, interp1d
+from scipy.interpolate import RegularGridInterpolator as RGI, interp1d
 from .constants import kpc, pi, G
 from .potential import potential_disc, potential_sh
 from .profiles import rho_sph, zeta, sigma
@@ -335,7 +335,7 @@ class MilkyWay:
 
         return a
 
-    def density(self, pos):
+    def density(self, pos, eps=0):
         """
         Evaluate density at given positions.
 
@@ -344,6 +344,8 @@ class MilkyWay:
         pos : array, shape (3) or (N, 3) or (N1, N2, N3, ..., 3)
             Positions at which to evaluate density, in 3D Galactocentric
             Cartesian coordinates. UNITS: m
+        eps : float
+            Gravitational softening. Default is 0. UNITS: m
 
         Returns
         -------
@@ -359,11 +361,11 @@ class MilkyWay:
         # loop over spheroids and add densities
         rho = np.zeros_like(R)
         for i in range(self.nspheroids):
-            rho += rho_sph(pos, **self.spars[i])
+            rho += rho_sph(pos, eps=eps, **self.spars[i])
 
         # loop over discs and add densities
         for i in range(self.ndiscs):
-            rho += sigma(R, **self.dpars[i]) * zeta(z, **self.dpars[i])
+            rho += sigma(R, eps=eps, **self.dpars[i]) * zeta(z, eps=eps, **self.dpars[i])
 
         # if only one position supplied, return float, not array
         if pos.ndim == 1:

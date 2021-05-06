@@ -12,7 +12,7 @@ import numpy as np
 from .util import sech
 
 
-def rho_sph(pos, alpha, beta, q, r_cut, r_0, rho_0):
+def rho_sph(pos, alpha, beta, q, r_cut, r_0, rho_0, eps=0):
     """
     Density of spheroid (theory.pdf eq.15).
 
@@ -32,6 +32,8 @@ def rho_sph(pos, alpha, beta, q, r_cut, r_0, rho_0):
         Scale radius. UNITS: m
     rho_0 : float
         Scale density. UNITS: kg / m^3
+    eps : float
+        Gravitational softening. Default is 0. UNITS: m
 
     Returns
     -------
@@ -43,8 +45,9 @@ def rho_sph(pos, alpha, beta, q, r_cut, r_0, rho_0):
     y = pos[..., 1]
     z = pos[..., 2]
     R = np.sqrt(x**2 + y**2)
-    rp = np.sqrt(R**2 + (z / q)**2)
+    rp = np.sqrt(R**2 + (z / q)**2 + eps**2)
 
+    # calculate density
     denom = (rp / r_0)**beta * (1 + rp / r_0)**alpha
     rho = (rho_0 / denom) * np.exp(-(rp / r_cut)**2)
     return rho
@@ -143,7 +146,7 @@ def bigH_p(z, z_0, form, **kwargs):
     return H_p
 
 
-def sigma(R, sigma_0, R_0, R_h, **kwargs):
+def sigma(R, sigma_0, R_0, R_h, eps=0, **kwargs):
     """
     Surface density of exponential disc with central hole (theory.pdf eq.16).
 
@@ -157,18 +160,24 @@ def sigma(R, sigma_0, R_0, R_h, **kwargs):
         Scale radius. UNITS: m
     R_h : float
         Hole radius. UNITS: m
+    eps : float
+        Gravitational softening. Default is 0. UNITS: m
 
     Returns
     -------
     sig : array, shape (N) or (N1, N2, N3, ...)
         Surface density of disc at given radii. UNITS: kg/m^2
     """
+    # apply softening
+    R = np.sqrt(R**2 + eps**2)
+
+    # calculate density
     x = (R_h / R) + (R / R_0)
     sig = sigma_0 * np.exp(-x)
     return sig
 
 
-def sigma_p(R, sigma_0, R_0, R_h, **kwargs):
+def sigma_p(R, sigma_0, R_0, R_h, eps=0, **kwargs):
     """
     First derivative of sigma function above (theory.pdf eq.17).
 
@@ -182,18 +191,24 @@ def sigma_p(R, sigma_0, R_0, R_h, **kwargs):
         Scale radius. UNITS: m
     R_h : float
         Hole radius. UNITS: m
+    eps : float
+        Gravitational softening. Default is 0. UNITS: m
 
     Returns
     -------
     sig_p : array, shape (N) or (N1, N2, N3, ...)
         d(sigma)/dR at given radii. UNITS: kg/m^3
     """
+    # apply softening
+    R = np.sqrt(R**2 + eps**2)
+
+    # calculate deriv
     x = (R_h / R) + (R / R_0)
     sig = -(sigma_0 / R_0) * np.exp(-x) * (1 - (R_h * R_0 / R**2))
     return sig
 
 
-def sigma_pp(R, sigma_0, R_0, R_h, **kwargs):
+def sigma_pp(R, sigma_0, R_0, R_h, eps=0, **kwargs):
     """
     Second derivative of sigma function above (theory.pdf eq.18).
 
@@ -207,12 +222,18 @@ def sigma_pp(R, sigma_0, R_0, R_h, **kwargs):
         Scale radius. UNITS: m
     R_h : float
         Hole radius. UNITS: m
+    eps : float
+        Gravitational softening. Default is 0. UNITS: m
 
     Returns
     -------
     sig_pp : array, shape (N) or (N1, N2, N3, ...)
         d^2(sigma)/dR^2 at given radii. UNITS: kg/m^4
     """
+    # apply softening
+    R = np.sqrt(R**2 + eps**2)
+    
+    # calculate deriv
     x = (R_h / R) + (R / R_0)
     fac = (1 - R_h * R_0 / R**2)**2 - 2 * R_h * R_0**2 / R**3
     sig = (sigma_0 / R_0**2) * np.exp(-x) * fac
