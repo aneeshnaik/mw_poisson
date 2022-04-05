@@ -196,7 +196,7 @@ class MilkyWay:
     def __create_potacc_interpolators(self, r, theta, pot):
         """Set up interpolators for potential and acceleration."""
         q = np.log(r)
-        self.__f_pot = RGI((q, theta), pot)
+        self.__f_pot = RGI((q, theta), pot, bounds_error=False, fill_value=None)
 
         # first derivs via finite differencing
         dpdq = np.diff(pot, axis=0) / np.diff(q)[:, None]
@@ -230,8 +230,8 @@ class MilkyWay:
         th_cen = np.hstack((0, th_cen, pi))
 
         # interpolators for cylindrical coords
-        self.__f_aR = RGI((q_cen, th_cen), -dpdR_new)
-        self.__f_az = RGI((q_cen, th_cen), -dpdz_new)
+        self.__f_aR = RGI((q_cen, th_cen), -dpdR_new, bounds_error=False, fill_value=None)
+        self.__f_az = RGI((q_cen, th_cen), -dpdz_new, bounds_error=False, fill_value=None)
 
         return
 
