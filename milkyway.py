@@ -263,7 +263,8 @@ class MilkyWay:
         theta = np.arccos(pos[..., 2] / r)
 
         # interpolate potential
-        pot = self.__f_pot.ev(q, theta)
+        #pot = self.__f_pot.ev(q, theta)
+        pot = self.__f_pot((q, theta))
 
         # if only one position supplied, return float, not array
         if pos.ndim == 1:
@@ -332,6 +333,9 @@ class MilkyWay:
         else:
             mask = r > self.r_max
             a[mask] = - G * M * pos[mask] / r[mask, None]**3
+
+        # if position 1D array, return acceleration as 1D array
+        a = a[0]
 
         return a
 
