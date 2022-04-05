@@ -52,7 +52,7 @@ Having found a solution for the potential, one can then obtain values for the po
 ```
 MilkyWay.potential can also take an array of positions as an argument, provided only that the size of the last dimension is 3.
 ```python
->>> pos = 10 * kpc * np.ones([2, 4, 3])*10*kpc
+>>> pos2D = 10 * kpc * np.ones([2, 4, 3])
 >>> gal.potential(pos2D)
 array([[-1.42270572e+11, -1.42270572e+11, -1.42270572e+11, -1.42270572e+11],
        [-1.42270572e+11, -1.42270572e+11, -1.42270572e+11, -1.42270572e+11]])
