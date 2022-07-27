@@ -335,7 +335,8 @@ class MilkyWay:
             a[mask] = - G * M * pos[mask] / r[mask, None]**3
 
         # if position 1D array, return acceleration as 1D array
-        a = a[0]
+        if pos.ndim == 1:
+            a = a[0]
 
         return a
 
